@@ -1,0 +1,24 @@
+[project]
+name = "long-term-order"
+version = "0.1.0"
+description = "通過永豐金 API 下長效單的 Discord 機器人"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.30.0",
+    "discord-py[speed]>=2.5.2",
+    "loguru>=0.6.0",
+    "pydantic-settings>=2.9.1",
+    "shioaji[speed]>=1.2.5",
+    "sqlmodel>=0.0.24",
+]
+
+[tool.pyright]
+enableTypeIgnoreComments = false
+reportIncompatibleMethodOverride = false
+reportIncompatibleVariableOverride = false
+reportUnnecessaryComparison = true
+reportUnnecessaryContains = true
+reportUnnecessaryIsInstance = true
+reportUnnecessaryTypeIgnoreComment = true
+typeCheckingMode = "standard"
