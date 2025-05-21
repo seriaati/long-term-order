@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
 
@@ -17,4 +18,5 @@ class Config(BaseSettings):
     simulation: bool = True
 
 
+load_dotenv()
 CONFIG = Config()  # pyright: ignore[reportCallIssue]
