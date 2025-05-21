@@ -1,34 +1,26 @@
 from __future__ import annotations
 
-import asyncio
-import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
 import shioaji as sj
-import shioaji.constant as sjc
-from discord.ext import commands, tasks
+from discord.ext import commands
 from loguru import logger
 from sqlmodel import SQLModel
 
 from bot.config import CONFIG
-from bot.db.models.order import Order
 from bot.db.session import engine
 from bot.ui import OrderView
 
 if TYPE_CHECKING:
     from shioaji.contracts import Contract
-    from shioaji.position import FuturePosition, StockPosition
 
 
 class Bot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(commands.when_mentioned, intents=discord.Intents.default())
         self.shioaji: sj.Shioaji
-
-    async def _get_positions(self) -> list[StockPosition | FuturePosition]:
-        api = self.shioaji
-        return await asyncio.to_thread(api.list_positions, api.stock_account)  # pyright: ignore[reportArgumentType]
 
     def get_contract(self, stock_id: str) -> Contract | None:
         api = self.shioaji
@@ -37,48 +29,6 @@ class Bot(commands.Bot):
             logger.warning(f"Contract {stock_id} not found")
             return None
         return contract
-
-    async def _place_order(self, order: Order) -> None:
-        api = self.shioaji
-        contract = self.get_contract(order.stock_id)
-        if contract is None:
-            logger.warning(f"Contract {order.stock_id} not found")
-            await order.delete()
-            return
-
-        order_obj = api.Order(
-            price=order.price,
-            quantity=order.quantity,
-            action=sjc.Action.Buy,
-            price_type=sjc.StockPriceType.LMT,
-            order_type=sjc.OrderType.ROD,
-            account=api.stock_account,
-        )
-        trade = await asyncio.to_thread(api.place_order, contract, order_obj)
-        logger.info(f"Placed order: {trade}")
-
-    @tasks.loop(
-        time=datetime.time(hour=8, minute=30, tzinfo=datetime.timezone(datetime.timedelta(hours=8)))
-    )
-    async def place_orders(self) -> None:
-        if not CONFIG.simulation:
-            positions = await self._get_positions()
-            position_ids = {p.code for p in positions}
-        else:
-            position_ids = {}
-        logger.info(f"Position IDs: {position_ids}")
-
-        orders = await Order.all()
-
-        for o in orders:
-            logger.info(f"Processing order: {o}")
-
-            if o.stock_id in position_ids:
-                logger.info(f"Order {o.stock_id} already in positions, skipping and deleting order")
-                await o.delete()
-                continue
-
-            await self._place_order(o)
 
     async def setup_hook(self) -> None:
         # Initialize db
@@ -93,6 +43,15 @@ class Bot(commands.Bot):
         )
         self.shioaji = api
         logger.info(f"Initialized shioaji api with simulation={CONFIG.simulation}")
+
+        # Load cogs
+        for filepath in Path("bot/cogs").glob("**/*.py"):
+            cog_name = Path(filepath).stem
+            try:
+                await self.load_extension(f"bot.cogs.{cog_name}")
+                logger.info(f"Loaded cog {cog_name!r}")
+            except Exception:
+                logger.exception(f"Failed to load cog {cog_name!r}")
 
         # Add persistent view
         self.add_view(OrderView())
