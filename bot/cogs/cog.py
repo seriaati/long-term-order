@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import shioaji.constant as sjc
 from discord.ext import commands, tasks
 from loguru import logger
+from shioaji import Shioaji
 
 from bot.config import CONFIG
 from bot.db.models.order import Order
@@ -29,21 +30,18 @@ class Cog(commands.Cog):
     async def cog_unload(self) -> None:
         self.place_orders.cancel()
 
-    async def _get_positions(self) -> list[StockPosition | FuturePosition]:
-        api = self.bot.shioaji
+    async def _get_positions(self, api: Shioaji) -> list[StockPosition | FuturePosition]:
         return await asyncio.to_thread(api.list_positions, api.stock_account)  # pyright: ignore[reportArgumentType]
 
-    def get_contract(self, stock_id: str) -> Contract | None:
-        api = self.bot.shioaji
+    def get_contract(self, api: Shioaji, *, stock_id: str) -> Contract | None:
         contract = api.Contracts.Stocks.get(stock_id)
         if contract is None:
             logger.warning(f"Contract {stock_id} not found")
             return None
         return contract
 
-    async def _place_order(self, order: Order) -> None:
-        api = self.bot.shioaji
-        contract = self.get_contract(order.stock_id)
+    async def _place_order(self, api: Shioaji, *, order: Order) -> None:
+        contract = self.get_contract(api, stock_id=order.stock_id)
         if contract is None:
             logger.warning(f"Contract {order.stock_id} not found")
             await order.delete()
@@ -65,9 +63,10 @@ class Cog(commands.Cog):
     )
     async def place_orders(self) -> None:
         logger.info("Place orders task started")
+        api = self.bot.get_shioaji()
 
         if not CONFIG.simulation:
-            positions = await self._get_positions()
+            positions = await self._get_positions(api)
             position_ids = {p.code for p in positions}
         else:
             position_ids = {}
@@ -83,7 +82,7 @@ class Cog(commands.Cog):
                 await o.delete()
                 continue
 
-            await self._place_order(o)
+            await self._place_order(api, order=o)
 
     @place_orders.before_loop
     async def before_place_orders(self) -> None:

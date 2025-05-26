@@ -20,10 +20,18 @@ if TYPE_CHECKING:
 class Bot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(commands.when_mentioned, intents=discord.Intents.default())
-        self.shioaji: sj.Shioaji
+
+    def get_shioaji(self) -> sj.Shioaji:
+        api = sj.Shioaji(CONFIG.simulation)
+        api.login(api_key=CONFIG.shioaji_api_key, secret_key=CONFIG.shioaji_api_secret)
+        api.activate_ca(
+            ca_path=CONFIG.ca_path, ca_passwd=CONFIG.ca_password, person_id=CONFIG.ca_person_id
+        )
+        logger.info(f"Initialized shioaji api with simulation={CONFIG.simulation}")
+        return api
 
     def get_contract(self, stock_id: str) -> Contract | None:
-        api = self.shioaji
+        api = self.get_shioaji()
         contract = api.Contracts.Stocks.get(stock_id)
         if contract is None:
             logger.warning(f"Contract {stock_id} not found")
@@ -34,15 +42,6 @@ class Bot(commands.Bot):
         # Initialize db
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
-
-        # Initialize shioaji api
-        api = sj.Shioaji(CONFIG.simulation)
-        api.login(api_key=CONFIG.shioaji_api_key, secret_key=CONFIG.shioaji_api_secret)
-        api.activate_ca(
-            ca_path=CONFIG.ca_path, ca_passwd=CONFIG.ca_password, person_id=CONFIG.ca_person_id
-        )
-        self.shioaji = api
-        logger.info(f"Initialized shioaji api with simulation={CONFIG.simulation}")
 
         # Load cogs
         for filepath in Path("bot/cogs").glob("**/*.py"):
