@@ -5,24 +5,18 @@ from typing import TYPE_CHECKING, Any
 import discord
 from discord import ui
 from loguru import logger
+from shioaji.order import Status
 
 from bot.db.models.order import Order
+from bot.ui.order import OrderManageView, OrderModal, OrderSelect
+from bot.ui.trade import TradeManageView, TradeSelect
+from bot.utils import get_shioaji
 
 if TYPE_CHECKING:
     from bot.types import Interaction
 
 
-class OrderModal(ui.Modal):
-    stock_id = ui.TextInput(label="股票代號", placeholder="2330", max_length=5)
-    price = ui.TextInput(label="價格", placeholder="28.3", max_length=5)
-    quantity = ui.TextInput(label="數量", placeholder="1", max_length=2, default="1")
-
-    async def on_submit(self, i: Interaction) -> Any:
-        await i.response.defer()
-        self.stop()
-
-
-class OrderView(ui.View):
+class MainView(ui.View):
     def __init__(self) -> None:
         super().__init__(timeout=None)
 
@@ -79,3 +73,36 @@ class OrderView(ui.View):
         embed.add_field(name="數量", value=str(order.quantity))
 
         await i.followup.send(embed=embed, ephemeral=True)
+
+    @ui.button(label="查看所有長效單", style=discord.ButtonStyle.secondary, custom_id="view_orders")
+    async def view_orders(self, i: Interaction, _: ui.Button) -> Any:
+        await i.response.send_message(content="稍等, 正在獲取長效單", ephemeral=True)
+
+        orders = await Order.all()
+        if not orders:
+            await i.edit_original_response(content="目前沒有任何長效單")
+            return
+
+        api = get_shioaji()
+        view = OrderManageView(orders, api.Contracts.Stocks)
+        await i.edit_original_response(
+            embed=OrderSelect.get_embed(view.order, api.Contracts.Stocks), view=view, content=None
+        )
+
+    @ui.button(label="查看所有預約單", style=discord.ButtonStyle.secondary, custom_id="view_trades")
+    async def view_trades(self, i: Interaction, _: ui.Button) -> Any:
+        await i.response.send_message(content="稍等, 正在獲取預約單", ephemeral=True)
+
+        api = get_shioaji()
+        api.update_status(api.stock_account)  # pyright: ignore[reportArgumentType]
+
+        trades = api.list_trades()
+        trades = [t for t in trades if t.status.status == Status.PreSubmitted]
+        if not trades:
+            await i.edit_original_response(content="目前沒有任何預約單")
+            return
+
+        view = TradeManageView(trades, api.Contracts.Stocks)
+        await i.edit_original_response(
+            embed=TradeSelect.get_embed(view.trade, api.Contracts.Stocks), view=view, content=None
+        )

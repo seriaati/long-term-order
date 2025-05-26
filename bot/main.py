@@ -4,14 +4,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
-import shioaji as sj
 from discord.ext import commands
 from loguru import logger
 from sqlmodel import SQLModel
 
-from bot.config import CONFIG
 from bot.db.session import engine
-from bot.ui import OrderView
+from bot.ui.main import MainView
+from bot.utils import get_shioaji
 
 if TYPE_CHECKING:
     from shioaji.contracts import Contract
@@ -21,17 +20,8 @@ class Bot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(commands.when_mentioned, intents=discord.Intents.default())
 
-    def get_shioaji(self) -> sj.Shioaji:
-        api = sj.Shioaji(CONFIG.simulation)
-        api.login(api_key=CONFIG.shioaji_api_key, secret_key=CONFIG.shioaji_api_secret)
-        api.activate_ca(
-            ca_path=CONFIG.ca_path, ca_passwd=CONFIG.ca_password, person_id=CONFIG.ca_person_id
-        )
-        logger.info(f"Initialized shioaji api with simulation={CONFIG.simulation}")
-        return api
-
     def get_contract(self, stock_id: str) -> Contract | None:
-        api = self.get_shioaji()
+        api = get_shioaji()
         contract = api.Contracts.Stocks.get(stock_id)
         if contract is None:
             logger.warning(f"Contract {stock_id} not found")
@@ -53,4 +43,4 @@ class Bot(commands.Bot):
                 logger.exception(f"Failed to load cog {cog_name!r}")
 
         # Add persistent view
-        self.add_view(OrderView())
+        self.add_view(MainView())

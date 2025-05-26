@@ -11,7 +11,8 @@ from shioaji import Shioaji
 
 from bot.config import CONFIG
 from bot.db.models.order import Order
-from bot.ui import OrderView
+from bot.ui.main import MainView
+from bot.utils import get_shioaji
 
 if TYPE_CHECKING:
     from shioaji.contracts import Contract
@@ -63,7 +64,8 @@ class Cog(commands.Cog):
     )
     async def place_orders(self) -> None:
         logger.info("Place orders task started")
-        api = self.bot.get_shioaji()
+
+        api = get_shioaji()
 
         if not CONFIG.simulation:
             positions = await self._get_positions(api)
@@ -91,7 +93,7 @@ class Cog(commands.Cog):
     @commands.is_owner()
     @commands.command(name="view")
     async def view(self, ctx: commands.Context) -> Any:
-        await ctx.send(view=OrderView())
+        await ctx.send(view=MainView())
 
     @commands.is_owner()
     @commands.command(name="task")
