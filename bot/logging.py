@@ -26,8 +26,8 @@ class InterceptHandler(logging.Handler):
 
 
 def setup_logging() -> None:
+    logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
+
     logger.remove()
     logger.add(sys.stderr, level="INFO")
-
-    logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
-    logger.add("logs/log.log", rotation="12 hours", retention="1 week", level="DEBUG")
+    logger.add("logs/log.log", rotation="1 day", retention="1 week", level="DEBUG")
