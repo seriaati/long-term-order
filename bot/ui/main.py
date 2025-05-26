@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import discord
+import shioaji.constant as sjc
 from discord import ui
 from loguru import logger
-from shioaji.order import Status
 
 from bot.db.models.order import Order
 from bot.ui.order import OrderManageView, OrderModal, OrderSelect
@@ -98,7 +98,7 @@ class MainView(ui.View):
         await api.update_status()
 
         trades = await api.list_trades()
-        trades = [t for t in trades if t.status.status == Status.PreSubmitted]
+        trades = [t for t in trades if t.status.status == sjc.Status.PreSubmitted]
         if not trades:
             await i.edit_original_response(content="目前沒有任何預約單")
             return

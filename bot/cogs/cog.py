@@ -69,9 +69,18 @@ class Cog(commands.Cog):
             position_ids = {}
         logger.info(f"Position IDs: {position_ids}")
 
+        await api.update_status()
+        trades = await api.list_trades()
+        trades = [t for t in trades if t.status.status == sjc.Status.PreSubmitted]
+        trade_stocks_ids = {t.contract.code for t in trades}
+
         orders = await Order.all()
         for o in orders:
             logger.info(f"Processing order: {o}")
+
+            if o.stock_id in trade_stocks_ids:
+                logger.info(f"Order {o.stock_id} already in pre-submitted trades, skipping order")
+                continue
 
             if o.stock_id in position_ids:
                 logger.info(f"Order {o.stock_id} already in positions, skipping and deleting order")
