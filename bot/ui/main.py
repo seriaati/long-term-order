@@ -54,8 +54,9 @@ class MainView(ui.View):
 
         logger.info(f"Recieved modal values: {stock_id=}, {price=}, {quantity=}")
 
-        contract = i.client.get_contract(stock_id)
-        if contract is None:
+        api = await get_shioaji()
+        stock = api.get_stock(stock_id)
+        if stock is None:
             await i.followup.send(f"找不到代號為 {stock_id} 的股票", ephemeral=True)
             return
 
@@ -68,7 +69,7 @@ class MainView(ui.View):
             logger.info(f"Created order: {order}")
 
         embed = discord.Embed(title="下單成功", color=discord.Color.green())
-        embed.add_field(name="股票", value=f"[{contract.code}] {contract.name}")
+        embed.add_field(name="股票", value=f"[{stock.code}] {stock.name}")
         embed.add_field(name="價格", value=str(order.price))
         embed.add_field(name="數量", value=str(order.quantity))
 
@@ -83,7 +84,7 @@ class MainView(ui.View):
             await i.edit_original_response(content="目前沒有任何長效單")
             return
 
-        api = get_shioaji()
+        api = await get_shioaji()
         view = OrderManageView(orders, api.Contracts.Stocks)
         await i.edit_original_response(
             embed=OrderSelect.get_embed(view.order, api.Contracts.Stocks), view=view, content=None
@@ -93,10 +94,10 @@ class MainView(ui.View):
     async def view_trades(self, i: Interaction, _: ui.Button) -> Any:
         await i.response.send_message(content="稍等, 正在獲取預約單", ephemeral=True)
 
-        api = get_shioaji()
-        api.update_status(api.stock_account)  # pyright: ignore[reportArgumentType]
+        api = await get_shioaji()
+        await api.update_status()
 
-        trades = api.list_trades()
+        trades = await api.list_trades()
         trades = [t for t in trades if t.status.status == Status.PreSubmitted]
         if not trades:
             await i.edit_original_response(content="目前沒有任何預約單")

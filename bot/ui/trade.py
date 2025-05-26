@@ -25,8 +25,8 @@ class TradeDeleteConfirmView(ui.View):
     async def confirm_delete(self, i: Interaction, _: ui.Button) -> Any:
         await i.response.defer()
 
-        api = get_shioaji()
-        api.cancel_order(self.trade)
+        api = await get_shioaji()
+        await api.cancel_order(self.trade)
         await i.edit_original_response(content="預約單已取消", view=None)
 
     @ui.button(label="取消", style=discord.ButtonStyle.secondary, custom_id="cancel_delete")
