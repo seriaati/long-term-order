@@ -56,4 +56,9 @@ class AsyncShioaji(sj.Shioaji):
         await asyncio.to_thread(super().update_status, self.stock_account)  # pyright: ignore[reportArgumentType]
 
     def get_stock(self, stock_id: str) -> Contract | None:
-        return self.Contracts.Stocks.get(stock_id)
+        for _ in range(3):
+            stock = self.Contracts.Stocks.get(stock_id)
+            if stock is not None:
+                return stock
+
+        return None
