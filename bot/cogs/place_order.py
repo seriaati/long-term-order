@@ -9,17 +9,16 @@ from loguru import logger
 
 from bot.config import CONFIG
 from bot.db.models.order import Order
+from bot.shioaji import AsyncShioaji
 from bot.ui.main import MainView
-from bot.utils import get_shioaji
 
 if TYPE_CHECKING:
     from shioaji.contracts import Contract
 
     from bot.main import Bot
-    from bot.shioaji import AsyncShioaji
 
 
-class Cog(commands.Cog):
+class PlaceOrderCog(commands.Cog):
     def __init__(self, bot: Bot) -> None:
         self.bot = bot
 
@@ -60,34 +59,38 @@ class Cog(commands.Cog):
     async def place_orders(self) -> None:
         logger.info("Place orders task started")
 
-        api = await get_shioaji()
+        async with AsyncShioaji() as api:
+            if not CONFIG.simulation:
+                positions = await api.list_positions()
+                position_ids = {p.code for p in positions}
+            else:
+                position_ids = {}
+            logger.info(f"Position IDs: {position_ids}")
 
-        if not CONFIG.simulation:
-            positions = await api.list_positions()
-            position_ids = {p.code for p in positions}
-        else:
-            position_ids = {}
-        logger.info(f"Position IDs: {position_ids}")
+            await api.update_status()
+            trades = await api.list_trades()
 
-        await api.update_status()
-        trades = await api.list_trades()
-        trades = [t for t in trades if t.status.status == sjc.Status.PreSubmitted]
-        trade_stocks_ids = {t.contract.code for t in trades}
+            trades = [t for t in trades if t.status.status == sjc.Status.PreSubmitted]
+            trade_stocks_ids = {t.contract.code for t in trades}
 
-        orders = await Order.all()
-        for o in orders:
-            logger.info(f"Processing order: {o}")
+            orders = await Order.all()
+            for o in orders:
+                logger.info(f"Processing order: {o}")
 
-            if o.stock_id in trade_stocks_ids:
-                logger.info(f"Order {o.stock_id} already in pre-submitted trades, skipping order")
-                continue
+                if o.stock_id in trade_stocks_ids:
+                    logger.info(
+                        f"Order {o.stock_id} already in pre-submitted trades, skipping order"
+                    )
+                    continue
 
-            if o.stock_id in position_ids:
-                logger.info(f"Order {o.stock_id} already in positions, skipping and deleting order")
-                await o.delete()
-                continue
+                if o.stock_id in position_ids:
+                    logger.info(
+                        f"Order {o.stock_id} already in positions, skipping and deleting order"
+                    )
+                    await o.delete()
+                    continue
 
-            await self._place_order(api, order=o)
+                await self._place_order(api, order=o)
 
     @place_orders.before_loop
     async def before_place_orders(self) -> None:
@@ -107,4 +110,4 @@ class Cog(commands.Cog):
 
 
 async def setup(bot: Bot) -> None:
-    await bot.add_cog(Cog(bot))
+    await bot.add_cog(PlaceOrderCog(bot))
