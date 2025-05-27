@@ -13,8 +13,6 @@ from bot.shioaji import AsyncShioaji
 from bot.ui.main import MainView
 
 if TYPE_CHECKING:
-    from shioaji.contracts import Contract
-
     from bot.main import Bot
 
 
@@ -28,18 +26,10 @@ class PlaceOrderCog(commands.Cog):
     async def cog_unload(self) -> None:
         self.place_orders.cancel()
 
-    def get_contract(self, api: AsyncShioaji, *, stock_id: str) -> Contract | None:
-        contract = api.Contracts.Stocks.get(stock_id)
-        if contract is None:
-            logger.warning(f"Contract {stock_id} not found")
-            return None
-        return contract
-
     async def _place_order(self, api: AsyncShioaji, *, order: Order) -> None:
         contract = api.get_stock(order.stock_id)
         if contract is None:
             logger.warning(f"Contract {order.stock_id} not found")
-            await order.delete()
             return
 
         order_obj = api.Order(
