@@ -4,14 +4,33 @@ import asyncio
 from typing import TYPE_CHECKING
 
 import shioaji as sj
+from loguru import logger
+
+from bot.config import CONFIG
 
 if TYPE_CHECKING:
+    from types import EllipsisType
+
     from shioaji.contracts import Contract
     from shioaji.order import Order, Trade
     from shioaji.position import FuturePosition, StockPosition
 
 
 class AsyncShioaji(sj.Shioaji):
+    def __init__(self, *, simulation: bool | EllipsisType = ...) -> None:
+        self.simulation = simulation if simulation is not ... else CONFIG.simulation
+
+    async def __aenter__(self) -> AsyncShioaji:
+        await self.login(api_key=CONFIG.shioaji_api_key, secret_key=CONFIG.shioaji_api_secret)
+        await self.activate_ca(
+            ca_path=CONFIG.ca_path, ca_passwd=CONFIG.ca_password, person_id=CONFIG.ca_person_id
+        )
+        logger.info(f"Initialized shioaji api with simulation={self.simulation}")
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:  # noqa: ANN001
+        await self.logout()
+
     async def place_order(self, contract: Contract, order: Order) -> Trade:
         return await asyncio.to_thread(super().place_order, contract, order)
 
@@ -23,6 +42,9 @@ class AsyncShioaji(sj.Shioaji):
 
     async def login(self, api_key: str, secret_key: str) -> None:
         await asyncio.to_thread(super().login, api_key, secret_key)
+
+    async def logout(self) -> None:
+        await asyncio.to_thread(super().logout)
 
     async def activate_ca(self, ca_path: str, ca_passwd: str, person_id: str) -> None:
         await asyncio.to_thread(super().activate_ca, ca_path, ca_passwd, person_id)

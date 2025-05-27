@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Any
 import discord
 from discord import ui
 
-from bot.utils import get_shioaji, get_stock_name
+from bot.shioaji import AsyncShioaji
+from bot.utils import get_stock_name
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -25,8 +26,8 @@ class TradeDeleteConfirmView(ui.View):
     async def confirm_delete(self, i: Interaction, _: ui.Button) -> Any:
         await i.response.defer()
 
-        api = await get_shioaji()
-        await api.cancel_order(self.trade)
+        async with AsyncShioaji() as api:
+            await api.cancel_order(self.trade)
         await i.edit_original_response(content="預約單已取消", view=None)
 
     @ui.button(label="取消", style=discord.ButtonStyle.secondary, custom_id="cancel_delete")

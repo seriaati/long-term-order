@@ -8,9 +8,9 @@ from discord import ui
 from loguru import logger
 
 from bot.db.models.order import Order
+from bot.shioaji import AsyncShioaji
 from bot.ui.order import OrderManageView, OrderModal, OrderSelect
 from bot.ui.trade import TradeManageView, TradeSelect
-from bot.utils import get_shioaji
 
 if TYPE_CHECKING:
     from bot.types import Interaction
@@ -54,8 +54,9 @@ class MainView(ui.View):
 
         logger.info(f"Recieved modal values: {stock_id=}, {price=}, {quantity=}")
 
-        api = await get_shioaji()
-        stock = api.get_stock(stock_id)
+        async with AsyncShioaji() as api:
+            stock = api.get_stock(stock_id)
+
         if stock is None:
             await i.followup.send(f"找不到代號為 {stock_id} 的股票", ephemeral=True)
             return
@@ -84,18 +85,20 @@ class MainView(ui.View):
             await i.edit_original_response(content="目前沒有任何長效單")
             return
 
-        api = await get_shioaji()
-        view = OrderManageView(orders, api.Contracts.Stocks)
-        await i.edit_original_response(
-            embed=OrderSelect.get_embed(view.order, api.Contracts.Stocks), view=view, content=None
-        )
+        async with AsyncShioaji() as api:
+            view = OrderManageView(orders, api.Contracts.Stocks)
+            await i.edit_original_response(
+                embed=OrderSelect.get_embed(view.order, api.Contracts.Stocks),
+                view=view,
+                content=None,
+            )
 
     @ui.button(label="查看所有預約單", style=discord.ButtonStyle.secondary, custom_id="view_trades")
     async def view_trades(self, i: Interaction, _: ui.Button) -> Any:
         await i.response.send_message(content="稍等, 正在獲取預約單", ephemeral=True)
 
-        api = await get_shioaji()
-        await api.update_status()
+        async with AsyncShioaji() as api:
+            await api.update_status()
 
         trades = await api.list_trades()
         trades = [t for t in trades if t.status.status == sjc.Status.PreSubmitted]
